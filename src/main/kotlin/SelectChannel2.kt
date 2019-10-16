@@ -1,12 +1,9 @@
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.onReceiveOrNull
 import kotlinx.coroutines.channels.produce
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
 
-@ExperimentalCoroutinesApi
+@InternalCoroutinesApi
 fun main() = runBlocking {
     val c1 = produce {
         repeat(4) { send(1); delay(100) }
@@ -19,18 +16,21 @@ fun main() = runBlocking {
     launch {
         while (true) {
             select<Unit> {
-                c1.onReceiveOrNull {
-                    if (it != null) {
-                        println(it)
+                c1.onReceiveOrClosed {
+                    if (!it.isClosed) {
+                        println(it.valueOrNull)
                     }
                 }
-                c2.onReceiveOrNull {
-                    if (it != null) {
-                        println(it)
+                c2.onReceiveOrClosed {
+                    if (!it.isClosed) {
+                        println(it.valueOrNull)
+                    } else {
+                        println("c1 is closed")
+                        delay(1000)
                     }
                 }
             }
-            if (c1.isClosedForReceive && c2.isClosedForReceive) {
+            if (c1.isEmpty || c2.isEmpty) {
                 break
             }
         }

@@ -1,51 +1,41 @@
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.onReceiveOrNull
+import kotlinx.coroutines.channels.onReceiveOrNull as onReceiveOrNullExt
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.handleCoroutineException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.selects.select
 
+@ExperimentalCoroutinesApi
 fun main() = runBlocking {
-    val c1 = produce {
-        repeat(10) {
-            send(1)
-            delay(100)
-        }
+    val c1: ReceiveChannel<Int> = produce {
+        repeat(4) { send(1); delay(100) }
     }
 
-    val c2 = produce {
-        repeat(10) {
-            send(2)
-            delay(200)
-        }
+    val c2: ReceiveChannel<Int> = produce {
+        repeat(4) { send(2); delay(200) }
     }
 
-    while (true) {
-        select<Unit> {
-            runCatching {
-                c1.onReceive {
-                    println(it)
-                }
-                c2.onReceive {
-                    println(it)
-                }
-            }.fold(
-                onSuccess = {},
-                onFailure = {e ->
-                    if (e is ClosedReceiveChannelException) {
-                        println("either c1 or c2 is closed: c1 => ${c1.isClosedForReceive}, c2 => ${c2.isClosedForReceive}")
-                    } else {
-                        throw e
+    launch {
+        while (true) {
+            select<Unit> {
+                c1.onReceiveOrNull {
+                    if (it != null) {
+                        println(it)
                     }
                 }
-            )
+                c2.onReceiveOrNull {
+                    if (it != null) {
+                        println(it)
+                    }
+                }
+            }
+            if (c1.isClosedForReceive && c2.isClosedForReceive) {
+                break
+            }
         }
-        if (c1.isClosedForReceive && c2.isClosedForReceive) {
-            break
-        }
-    }
+    }.join()
 
     println("finish")
 }
